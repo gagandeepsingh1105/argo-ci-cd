@@ -1,0 +1,56 @@
+gcloud container clusters get-credentials ci-cd-pipeline --region northamerica-northeast1 --project phx-01h7jztawwz09ct30bgp1tfj9m
+
+kubectl apply -n argo -f https://github.com/argoproj/argo-workflows/releases/download/v3.5.8/install.yaml
+
+kubectl create clusterrole argowork --verb=list,update --resource=workflows.argoproj.io  # not required as I used admin cluster role 
+
+kubectl create sa argowork -n argo #not required as I used the default in argo namespace
+
+kubectl create clusterrolebinding argowork --clusterrole=argowork --serviceaccount=argo:argowork
+
+kubectl create clusterrolebinding argo-default-admin --clusterrole=admin --serviceaccount=argo:default -n argo
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argowork.service-account-token
+  namespace: argo
+  annotations:
+    kubernetes.io/service-account.name: default
+type: kubernetes.io/service-account-token
+EOF
+
+ARGO_TOKEN="Bearer $(kubectl get secret argowork.service-account-token -n argo -o=jsonpath='{.data.token}' | base64 --decode)"
+
+Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IlJIVlIxMTdUQ00xelAtQ1FhWUlqQlFPaU5KVWI1bldiOHpQNFpEX1Nfd0EifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJhcmdvIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImFyZ293b3JrLnNlcnZpY2UtYWNjb3VudC10b2tlbiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiMGE1MjEwZjYtOThmZS00YTNkLWJkZmItMWM2MjE0N2UyZGQxIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmFyZ286ZGVmYXVsdCJ9.HCh_kcDnXVu4yyns0MWt8ZX4LcbW3c-_Gi4XLTuKSbGTqo4GB1KrQ_3V1N9FvoZ41cvy47V5LYy1mW0SJrviN6hxGANqNJx9GBZ8639JniMw9nv08StDczj5zrqS5eTtPQboIVF4ee0dXWEB3Miz2c6rVz6aaUFH4kMEfTotegvS4U7wslxT0uKjSwGum2WqKUZZ0ljXZcl4P0FNHpMD375X8IX16YC5-VuDin218p-u2eqMtN5EfMbsjwHiHTLdxumUJDsV9CImGlfMhqFp4e6_Kc-4jMTNTury6rVzYXMH--JaN4mQBQ_9AbvaMJs3D35oQ2FioUjDKtE1hBwWdQ
+
+https://github.com/gagandeepsingh1105/mockapi.git
+
+
+kubectl -n argo create secret generic git-user-pass \
+    --from-literal=username=gagandeepsingh1105@gmail.com \
+    --from-literal=password='Waheguruuuu@1'
+
+kubectl -n argo get secret git-user-pass -o jsonpath='{.data}'
+
+gcloud iam service-accounts create gsa-workload-identity --display-name "Google Service Account for Workload Identity"
+
+gcloud projects add-iam-policy-binding phx-01h7jztawwz09ct30bgp1tfj9m \
+  --member=serviceAccount:gsa-workload-identity@phx-01h7jztawwz09ct30bgp1tfj9m.iam.gserviceaccount.com \
+  --role=roles/storage.objectAdmin (We need to add one more role to it, i.e. Artifact registery admin)
+
+kubectl create serviceaccount ksa-workload-identity -n argo
+
+gcloud iam service-accounts add-iam-policy-binding gsa-workload-identity@phx-01h7jztawwz09ct30bgp1tfj9m.iam.gserviceaccount.com \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:phx-01h7jztawwz09ct30bgp1tfj9m.svc.id.goog[argo/default]"
+
+kubectl annotate serviceaccount default \
+    --namespace argo \
+    iam.gke.io/gcp-service-account=gsa-workload-identity@phx-01h7jztawwz09ct30bgp1tfj9m.iam.gserviceaccount.com
+
+
+northamerica-northeast1-docker.pkg.dev/phx-01h7jztawwz09ct30bgp1tfj9m/cloud-run-source-deploy/ci-cd-image
+
+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
