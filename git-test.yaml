@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: git-test
+spec:
+  entrypoint: pipeline
+  #prepare a volume claim for the entire workflow
+  volumeClaimTemplates:
+    - metadata:
+        name: repo-root
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+  #start the sequence
+  templates:
+    - name: pipeline
+      dag:
+        tasks:
+            - name: fetch-config
+              template: fetch-config              
+            - name: check-digest
+              template: check-digest              
+              dependencies:
+                - fetch-config                 
+        #todo add other steps later
+
+
+    - name: check-digest
+      container:
+        image: alpine/git:latest
+        command: [sh, -c]
+        args:                     
+          [
+          "cd /workdir/configrepo/mockapi_deployment.git; git checkout -b test;sed -i 's/sha256.*/sha256:c0d483d8414b577399938cbf0a765efbc96da37c62110a63a9ba86053928cd50/' mockapi_deployment.yaml; git add mockapi_deployment.yaml;git config user.email $git_user_email; git config user.name $git_user;git commit -m 'test'; git branch;git status;git remote set-url origin https://$git_user:$git_token@github.com/gagandeepsingh1105/mockapi_deployment.git", 
+          ]
+        env:
+          - name: git_user 
+            valueFrom:
+              secretKeyRef:
+                key: username
+                name: git-access
+          - name: git_user_email 
+            valueFrom:
+              secretKeyRef:
+                key: email
+                name: git-access
+          - name: git_token 
+            valueFrom:
+              secretKeyRef:
+                key: token
+                name: git-access                
+        volumeMounts:
+          - name: repo-root
+            mountPath: /workdir ##              
+            
+    - name: fetch-config
+      container:
+        image: k8s.gcr.io/git-sync:v3.1.6
+        args:
+            - "--repo=https://github.com/gagandeepsingh1105/mockapi_deployment.git"
+            - "--root=/workdir/configrepo"
+            - "--max-sync-failures=3"
+            - "--timeout=200"
+            - "--branch=main"
+            - "--one-time"            
+        volumeMounts:
+          - name: repo-root
+            mountPath: /workdir ##
+      securityContext:
+        runAsUser: 0         
+
+
+
+
